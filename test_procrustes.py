@@ -1,6 +1,5 @@
 import numpy as np
 from pls import fit_pls, _procrustes_rotation
-from sklearn.cross_decomposition.pls_ import PLSSVD
 n_subjects = 200
 n_brain_dim = 2000
 n_beh_dim = 15

@@ -10,6 +10,8 @@ from scipy.stats.mstats_basic import zscore
 import pyprind
 from sklearn.utils import arpack
 from sklearn.decomposition.truncated_svd import TruncatedSVD
+from sklearn.preprocessing.data import scale
+from scipy.stats.stats import percentileofscore
 
 def _permute_and_calc_singular_values(X, Y, X_saliences, Y_saliences, singular_values_samples, perm_i, n_components, procrustes=False, algorithm="randomized"):
     if len(X) < len(Y):
@@ -37,9 +39,8 @@ def _boostrap(X, Y, X_saliences, Y_saliences, X_saliences_bootstraps, Y_salience
     sample_indices = np.random.choice(range(X.shape[0]), size=X.shape[0], replace=True)
     X_boot = X[sample_indices,:]
     Y_boot = Y[sample_indices,:]
-
-    X_boot_scaled = sp.stats.mstats.zscore(X_boot, axis=0, ddof=1)
-    Y_boot_scaled = sp.stats.mstats.zscore(Y_boot, axis=0, ddof=1)
+    X_boot_scaled = scale(X_boot)
+    Y_boot_scaled = scale(Y_boot)
 
     covariance_boot = np.dot(Y_boot_scaled.T, X_boot_scaled)
     svd = TruncatedSVD(n_components, algorithm=algorithm)
@@ -52,12 +53,8 @@ def _boostrap(X, Y, X_saliences, Y_saliences, X_saliences_bootstraps, Y_salience
         Y_saliences_bootstraps[:,:,bootstrap_i], rotation_matrix = _procrustes_rotation(Y_saliences, Y_saliences_boot)
         X_saliences_bootstraps[:,:,bootstrap_i] = np.dot(X_saliences_boot, rotation_matrix)
     else:
-        X_saliences_boot_rotated, _, rotation_matrix = _procrustes_rotation(X_saliences, X_saliences_boot)
-        X_saliences_bootstraps[:,:,bootstrap_i] = X_saliences_boot_rotated
-        Y_saliences_bootstraps[:,:,bootstrap_i] = np.dot(X_saliences_boot, rotation_matrix)
-
-def _calc_p_val(singular_value_samples, singular_value, saliences_p_vals, component_i):
-    saliences_p_vals[component_i] = (100-sp.stats.percentileofscore(singular_value_samples,singular_value))/100.0
+        X_saliences_bootstraps[:,:,bootstrap_i], rotation_matrix = _procrustes_rotation(X_saliences, X_saliences_boot)
+        Y_saliences_bootstraps[:,:,bootstrap_i] = np.dot(Y_saliences_boot, rotation_matrix)
     
 def _procrustes_rotation(fixed, moving, moving_singular_values=None):
     N, _, P = np.linalg.svd(np.dot(fixed.T,moving))
@@ -71,42 +68,6 @@ def _procrustes_rotation(fixed, moving, moving_singular_values=None):
     else:
         return rotated, rotation_matrix
     
-
-def PLS(X,Y, n_perm=1000, n_boot=1000, n_jobs=None):
-        
-    #scaling
-    X_scaled = sp.stats.mstats.zscore(X, axis=0, ddof=1)
-    Y_scaled = sp.stats.mstats.zscore(Y, axis=0, ddof=1)
-    
-    covariance = np.dot(Y_scaled.T, X_scaled)
-    Y_saliences, singular_values, X_saliences = linalg.svd(covariance, full_matrices=False)
-    inertia = singular_values.sum()
-    
-    n_components = len(singular_values)
-    
-    #permutation test
-    singular_values_samples = np.zeros((n_components, n_perm))
-    Parallel(n_jobs=n_jobs, backend="threading")(delayed(_permute_and_calc_singular_values)(X_scaled, Y_scaled, singular_values_samples, perm_i) for perm_i in range(n_perm))
-    
-    saliences_p_vals = np.zeros((n_components,))
-    Parallel(n_jobs=n_jobs, backend="threading")(delayed(_calc_p_val)(singular_values_samples[component_i,:], singular_values[component_i], saliences_p_vals, component_i) for component_i in range(n_components))
-       
-    inertia_p_val = (100-sp.stats.percentileofscore(singular_values_samples.sum(axis=0), inertia))/100.0
-    
-    #bootstrap
-    X_saliences_bootstraps = np.zeros(X_saliences.shape + (n_boot,))
-    Y_saliences_bootstraps = np.zeros(Y_saliences.shape + (n_boot,))
-    #for boot_i in range(n_boot):
-    #    _boostrap(X, Y, X_saliences_bootstraps, Y_saliences_bootstraps, boot_i)
-    #    print boot_i
-    Parallel(n_jobs=n_jobs, backend="threading")(delayed(_boostrap)(X, Y, X_saliences_bootstraps, Y_saliences_bootstraps, boot_i) for boot_i in range(n_boot))
-    
-    X_saliences_bootstrap_ratios = X_saliences_bootstraps.mean(axis=2)/X_saliences_bootstraps.std(axis=2)
-    Y_saliences_bootstrap_ratios = Y_saliences_bootstraps.mean(axis=2)/Y_saliences_bootstraps.std(axis=2)
-    
-    return X_saliences, Y_saliences, saliences_p_vals, X_saliences_bootstrap_ratios, Y_saliences_bootstrap_ratios, inertia, inertia_p_val, singular_values
-
-
 def fit_pls(X, Y, n_components, scale=True, algorithm="randomized"):
     #scaling
     if scale:
@@ -144,24 +105,54 @@ def permutation_test(X_scaled, Y_scaled, X_saliences, Y_saliences, singular_valu
     
     saliences_p_vals = np.zeros((n_components,))
     for component_i in range(n_components):
-        saliences_p_vals[component_i] = (100.0-sp.stats.percentileofscore(singular_values_samples[component_i,:], singular_values[component_i]))/100.0
+        saliences_p_vals[component_i] = (100.0-percentileofscore(singular_values_samples[component_i,:], singular_values[component_i]))/100.0
        
-    inertia_p_val = (100.0-sp.stats.percentileofscore(singular_values_samples.sum(axis=0), inertia))/100.0
+    inertia_p_val = (100.0-percentileofscore(singular_values_samples.sum(axis=0), inertia))/100.0
     
     return saliences_p_vals, inertia_p_val
 
-def bootstrap_test(X, Y, X_saliences, Y_saliences, n_boot, n_components):
+def bootstrap_test(X, Y, X_saliences, Y_saliences, n_boot, n_components, verbose=True):
     #bootstrap
     X_saliences_bootstraps = np.zeros(X_saliences.shape + (n_boot,))
     Y_saliences_bootstraps = np.zeros(Y_saliences.shape + (n_boot,))
-    #for boot_i in range(n_boot):
-    #    _boostrap(X, Y, X_saliences_bootstraps, Y_saliences_bootstraps, boot_i)
-    #    print boot_i
+
+    if verbose:
+        my_perc = pyprind.ProgBar(n_boot, title='running bootstraps', monitor=True)
+
     for boot_i in range(n_boot):
         _boostrap(X, Y, X_saliences, Y_saliences, X_saliences_bootstraps, Y_saliences_bootstraps, boot_i, n_components)
+        if verbose:
+            my_perc.update()
+    if verbose:
+        print my_perc
     
     X_saliences_bootstrap_ratios = X_saliences_bootstraps.mean(axis=2)/X_saliences_bootstraps.std(axis=2)
     Y_saliences_bootstrap_ratios = Y_saliences_bootstraps.mean(axis=2)/Y_saliences_bootstraps.std(axis=2)
     
     return X_saliences_bootstrap_ratios, Y_saliences_bootstrap_ratios
         
+        
+def run_pls(X, Y, n_components, n_perm=100, n_boot=100):
+    X_saliences, Y_saliences, singular_values, inertia, X_scaled, Y_scaled = fit_pls(X, Y, 
+                                                                                     n_components=n_components, 
+                                                                                     scale=True, 
+                                                                                     algorithm="randomized")
+    
+    saliences_p_vals, inertia_p_val = permutation_test(X_scaled, 
+                                                       Y_scaled, 
+                                                       X_saliences, 
+                                                       Y_saliences, 
+                                                       singular_values, 
+                                                       inertia, 
+                                                       n_perm, 
+                                                       verbose=True,
+                                                       algorithm="arpack")
+    
+    X_saliences_bootstrap_ratios, Y_saliences_bootstrap_ratios = bootstrap_test(X, Y, 
+                                                                                X_saliences, 
+                                                                                Y_saliences, 
+                                                                                n_boot, 
+                                                                                n_components)
+    
+    return X_saliences, Y_saliences, saliences_p_vals, X_saliences_bootstrap_ratios, Y_saliences_bootstrap_ratios
+
