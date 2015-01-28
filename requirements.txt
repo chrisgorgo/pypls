@@ -1,0 +1,5 @@
+pyprind
+psutil
+numpy
+scipy
+scikit-learn
