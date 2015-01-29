@@ -16,6 +16,6 @@ setup(
     license="MIT",
     description="Pure python implementstion of Partial Least Squares inference",
 
-    install_requires = ["pyprind", "psutil", "numpy", "scipy", "scikit-learn"],
+    install_requires = ["pyprind>=2.9", "psutil>=2.2", "numpy>=1.9", "scipy", "scikit-learn>=0.15"],
     zip_safe=False
 )
