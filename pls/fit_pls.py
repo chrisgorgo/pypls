@@ -3,6 +3,10 @@ Created on 15 Apr 2014
 
 @author: gorgolewski
 '''
+from __future__ import division
+from __future__ import print_function
+from builtins import range
+from past.utils import old_div
 import scipy as sp
 import numpy as np
 from sklearn.utils.extmath import randomized_svd
@@ -36,7 +40,7 @@ def _permute_and_calc_singular_values(X, Y, X_saliences, Y_saliences, singular_v
     
     
 def _boostrap(X, Y, X_saliences, Y_saliences, X_saliences_bootstraps, Y_saliences_bootstraps, bootstrap_i, n_components, algorithm="randomized"):
-    sample_indices = np.random.choice(range(X.shape[0]), size=X.shape[0], replace=True)
+    sample_indices = np.random.choice(list(range(X.shape[0])), size=X.shape[0], replace=True)
     X_boot = X[sample_indices,:]
     Y_boot = Y[sample_indices,:]
     X_boot_scaled = scale(X_boot)
@@ -100,14 +104,14 @@ def permutation_test(X_scaled, Y_scaled, X_saliences, Y_saliences, singular_valu
         if verbose:
             my_perc.update()
     if verbose:
-        print my_perc
-        print "calculating p values"
+        print(my_perc)
+        print("calculating p values")
     
     saliences_p_vals = np.zeros((n_components,))
     for component_i in range(n_components):
-        saliences_p_vals[component_i] = (100.0-percentileofscore(singular_values_samples[component_i,:], singular_values[component_i]))/100.0
+        saliences_p_vals[component_i] = old_div((100.0-percentileofscore(singular_values_samples[component_i,:], singular_values[component_i])),100.0)
        
-    inertia_p_val = (100.0-percentileofscore(singular_values_samples.sum(axis=0), inertia))/100.0
+    inertia_p_val = old_div((100.0-percentileofscore(singular_values_samples.sum(axis=0), inertia)),100.0)
     
     return saliences_p_vals, inertia_p_val
 
@@ -124,10 +128,10 @@ def bootstrap_test(X, Y, X_saliences, Y_saliences, n_boot, n_components, verbose
         if verbose:
             my_perc.update()
     if verbose:
-        print my_perc
+        print(my_perc)
     
-    X_saliences_bootstrap_ratios = X_saliences_bootstraps.mean(axis=2)/X_saliences_bootstraps.std(axis=2)
-    Y_saliences_bootstrap_ratios = Y_saliences_bootstraps.mean(axis=2)/Y_saliences_bootstraps.std(axis=2)
+    X_saliences_bootstrap_ratios = old_div(X_saliences_bootstraps.mean(axis=2),X_saliences_bootstraps.std(axis=2))
+    Y_saliences_bootstrap_ratios = old_div(Y_saliences_bootstraps.mean(axis=2),Y_saliences_bootstraps.std(axis=2))
     
     return X_saliences_bootstrap_ratios, Y_saliences_bootstrap_ratios
         

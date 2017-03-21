@@ -1,3 +1,5 @@
+from __future__ import print_function
+from builtins import str
 import pandas as pd
 from pls import run_pls
 import numpy as np
@@ -11,10 +13,10 @@ ASR_items = ASR_items.ix[:, columns].ix[:,2:136].dropna(axis=0)
 
 merged = NEO_items.join(ASR_items, how="inner")
 neoffi = merged.ix[:,0:60]
-print neoffi.shape
+print(neoffi.shape)
 
 asr = merged.ix[:,60:194]
-print asr.shape
+print(asr.shape)
 
 neo_saliences, asr_saliences, salience_p_values, neo_saliences_bootstrap_ratios, asr_saliences_bootstrap_ratios = run_pls(np.array(neoffi), 
                                                                                                                           np.array(asr), 
@@ -22,8 +24,8 @@ neo_saliences, asr_saliences, salience_p_values, neo_saliences_bootstrap_ratios,
                                                                                                                           n_perm=500,
                                                                                                                           n_boot=500)
 
-print "saliences_p_vals = %s"%str(list(salience_p_values))
-print "neo_saliences_bootstrap_ratios.shape = %s"%str(neo_saliences_bootstrap_ratios.shape)
-print "max(neo_saliences_bootstrap_ratios) = %s"%str(neo_saliences_bootstrap_ratios.max())
-print "asr_saliences_bootstrap_ratios.shape = %s"%str(asr_saliences_bootstrap_ratios.shape)
-print "max(asr_saliences_bootstrap_ratios) = %s"%str(asr_saliences_bootstrap_ratios.max())
+print("saliences_p_vals = %s"%str(list(salience_p_values)))
+print("neo_saliences_bootstrap_ratios.shape = %s"%str(neo_saliences_bootstrap_ratios.shape))
+print("max(neo_saliences_bootstrap_ratios) = %s"%str(neo_saliences_bootstrap_ratios.max()))
+print("asr_saliences_bootstrap_ratios.shape = %s"%str(asr_saliences_bootstrap_ratios.shape))
+print("max(asr_saliences_bootstrap_ratios) = %s"%str(asr_saliences_bootstrap_ratios.max()))
