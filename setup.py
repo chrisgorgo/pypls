@@ -8,7 +8,7 @@ setup(
     version="0.1.0",
 
     # Packages
-    packages=["pls"],
+    packages=find_packages(),
 
     # Data
     # package_data = {'pyneurovault':['template/*.html']},
